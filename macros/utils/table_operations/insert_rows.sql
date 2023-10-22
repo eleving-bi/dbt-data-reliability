@@ -18,7 +18,7 @@
     {{ elementary.file_log('Inserting {} rows to table {}'.format(rows | length, table_relation)) }}
     {% set insert_rows_method = elementary.get_config_var('insert_rows_method') %}
     {% if insert_rows_method == 'max_query_size' %}
-      {% set insert_rows_queries = elementary.get_insert_rows_queries(table_relation, columns, rows, on_query_exceed=on_query_exceed) %}
+      {% set insert_rows_queries = get_insert_rows_queries(table_relation, columns, rows, on_query_exceed=on_query_exceed) %}
       {% set queries_len = insert_rows_queries | length %}
       {% for insert_query in insert_rows_queries %}
         {% do elementary.file_log("[{}/{}] Running insert query.".format(loop.index, queries_len)) %}
