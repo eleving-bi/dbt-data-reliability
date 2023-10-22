@@ -43,7 +43,7 @@
     {{- input_json -}}
 {% endmacro %}
 
-{# Truncate column 'adapter_response' #}
+{# Truncate columns 'adapter_response', 'message' #}
 {% macro flatten_run_result(run_result) %}
     {% set run_result_dict = run_result.to_dict() %}
     {% set node = elementary.safe_get_with_default(run_result_dict, 'node', {}) %}
@@ -53,7 +53,7 @@
         'invocation_id': invocation_id,
         'unique_id': node.get('unique_id'),
         'name': node.get('name'),
-        'message': run_result_dict.get('message'),
+        'message': truncate_text(run_result_dict.get('message'), elementary.get_config_var('long_string_size')),
         'generated_at': elementary.datetime_now_utc_as_string(),
         'rows_affected': run_result_dict.get('adapter_response', {}).get('rows_affected'),
         'execution_time': run_result_dict.get('execution_time'),
@@ -69,7 +69,7 @@
         'query_id': run_result_dict.get('adapter_response', {}).get('query_id'),
         'thread_id': run_result_dict.get('thread_id'),
         'materialization': config_dict.get('materialized'),
-        'adapter_response': truncate_text_in_json(run_result_dict.get('adapter_response', {}),'_message',1000)
+        'adapter_response': truncate_text_in_json(run_result_dict.get('adapter_response', {}),'_message', 1000)
     } %}
 
     {% set timings = elementary.safe_get_with_default(run_result_dict, 'timing', []) %}
