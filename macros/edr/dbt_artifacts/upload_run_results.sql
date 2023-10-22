@@ -2,7 +2,7 @@
     {% set relation = elementary.get_elementary_relation('dbt_run_results') %}
     {% if execute and relation %}
         {{ elementary.file_log("Uploading run results.") }}
-        {% do elementary.upload_artifacts_to_table(relation, results, flatten_run_result, append=True, should_commit=True, on_query_exceed=elementary.on_run_result_query_exceed) %}
+        {% do elementary.upload_artifacts_to_table(relation, results, elementary.flatten_run_result, append=True, should_commit=True, on_query_exceed=elementary.on_run_result_query_exceed) %}
         {{ elementary.file_log("Uploaded run results successfully.") }}
     {% endif %}
     {{ return ('') }}
@@ -36,6 +36,14 @@
     {{ return(dbt_run_results_empty_table_query) }}
 {% endmacro %}
 
+{# Custom macro to truncate json text not to exceed VERTICA column max length #}
+{% macro truncate_text_in_json(input_json, key, characters) -%}
+    {% set truncated_text = input_json[key]|truncate(characters, False, "") -%}
+    {% do input_json.update({key: truncated_text}) -%}
+    {{- input_json -}}
+{% endmacro %}
+
+{# Truncate column 'adapter_response' #}
 {% macro flatten_run_result(run_result) %}
     {% set run_result_dict = run_result.to_dict() %}
     {% set node = elementary.safe_get_with_default(run_result_dict, 'node', {}) %}
@@ -61,7 +69,7 @@
         'query_id': run_result_dict.get('adapter_response', {}).get('query_id'),
         'thread_id': run_result_dict.get('thread_id'),
         'materialization': config_dict.get('materialized'),
-        'adapter_response': run_result_dict.get('adapter_response', {})
+        'adapter_response': truncate_text_in_json(run_result_dict.get('adapter_response', {}),'_message',1000)
     } %}
 
     {% set timings = elementary.safe_get_with_default(run_result_dict, 'timing', []) %}
