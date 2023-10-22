@@ -42,6 +42,11 @@
     {% do input_json.update({key: truncated_text}) -%}
     {{- input_json -}}
 {% endmacro %}
+    
+{# Custom macro to truncate text not to exceed VERTICA column max length #}
+{% macro truncate_text(input_text, characters) -%}
+    {{- input_text[:characters] if input_text else input_text -}}
+{% endmacro %}
 
 {# Truncate columns 'adapter_response', 'message' #}
 {% macro flatten_run_result(run_result) %}
