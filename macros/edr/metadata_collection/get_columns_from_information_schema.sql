@@ -17,6 +17,18 @@
     where upper(table_schema) = upper('{{ schema_name }}')
 {% endmacro %}
 
+{% macro vertica__get_columns_from_information_schema(database_name, schema_name) %}
+    select
+        upper('{{ database_name }}' || '.' || table_schema || '.' || table_name) as full_table_name,
+        upper('{{ database_name }}') as database_name,
+        upper(table_schema) as schema_name,
+        upper(table_name) as table_name,
+        upper(column_name) as column_name,
+        data_type
+    from V_CATALOG.COLUMNS
+    where upper(table_schema) = upper('{{ schema_name }}')
+{% endmacro %}
+
 {% macro bigquery__get_columns_from_information_schema(database_name, schema_name) %}
     {% set schema_relation = api.Relation.create(database=database_name, schema=schema_name).without_identifier() %}
     {% set columns_schema = schema_relation.information_schema('COLUMNS') %}
