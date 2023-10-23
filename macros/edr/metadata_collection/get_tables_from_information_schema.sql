@@ -41,6 +41,29 @@
     on (tables.database_name = schemas.database_name and tables.schema_name = schemas.schema_name)
 {% endmacro %}
 
+{% macro vertica__get_tables_from_information_schema(schema_tuple) %}
+    {%- set database_name, schema_name = schema_tuple %}
+
+    with information_schema_tables as (
+
+        select
+            upper('{{ database_name }}') as database_name,
+            upper(table_schema) as schema_name,
+            upper(table_name) as table_name
+        from V_CATALOG.TABLES
+            where upper(table_schema) = upper('{{ schema_name }}')
+
+    )
+
+    select
+        {{ elementary.full_table_name() }} as full_table_name,
+        upper(database_name || '.' || schema_name) as full_schema_name,
+        database_name,
+        schema_name,
+        table_name
+    from information_schema_tables
+{% endmacro %}
+
 {% macro redshift__get_tables_from_information_schema(schema_tuple) %}
     {%- set database_name, schema_name = schema_tuple %}
 
