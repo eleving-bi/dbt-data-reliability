@@ -73,3 +73,9 @@
     {% do default_config.update({'query_max_size': 250000}) %}
     {{- return(default_config) -}}
 {%- endmacro -%}
+
+{%- macro vertica__get_default_config() -%}
+    {% set default_config = elementary.default__get_default_config() %}
+    {% do default_config.update({'long_string_size': 65000}) %}
+    {{- return(default_config) -}}
+{%- endmacro -%}
