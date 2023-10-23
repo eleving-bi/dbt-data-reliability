@@ -8,6 +8,14 @@
     dateadd({{ date_part }}, {{ elementary.edr_cast_as_int(number) }}, {{ elementary.edr_cast_as_timestamp(timestamp_expression) }})
 {% endmacro %}
 
+{% macro vertica__edr_timeadd(date_part, number, timestamp_expression) %}
+    {%- if date_part | lower in ['second', 'minute', 'hour', 'day', 'month', 'year'] %} {# 'week', 'quarter' are not suported in VERTICA#}
+        {{ timestamp_expression }} + INTERVAL '1' {{ date_part }} * {{ elementary.edr_cast_as_int(number) }}
+    {%- else %}
+        {{ timestamp_expression }}
+    {%- endif %}
+{% endmacro %}
+
 {% macro bigquery__edr_timeadd(date_part, number, timestamp_expression) %}
     {%- if date_part | lower in ['second', 'minute', 'hour', 'day'] %}
        timestamp_add({{ elementary.edr_cast_as_timestamp(timestamp_expression) }}, INTERVAL {{ elementary.edr_cast_as_int(number) }} {{ date_part }})
