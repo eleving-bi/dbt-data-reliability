@@ -7,6 +7,10 @@
 {%- endmacro -%}
 
 {%- macro vertica__edr_cast_as_timestamp(timestamp_field) -%}
+    {{ timestamp_field }}::TIMESTAMP
+{%- endmacro -%}
+
+{%- macro edr_cast_string_to_timestamp(timestamp_field) -%}
     '{{ timestamp_field }}'::TIMESTAMP
 {%- endmacro -%}
 
