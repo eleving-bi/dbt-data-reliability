@@ -29,6 +29,11 @@
     {% do return("varchar(4096)") %}
 {% endmacro %}
 
+{% macro vertica__edr_type_string() %}
+    {# Default max string size in Vertica is 65K #}
+    {% do return("varchar(4096)") %}
+{% endmacro %}
+
 {% macro postgres__edr_type_string() %}
     {% if var("sync", false) %}
         {% do return("text") %}
@@ -60,6 +65,11 @@
 {%- macro default__edr_type_long_string() -%}
     {# Snowflake, Bigquery, Databricks #}
     {% do return(elementary.edr_type_string()) %}
+{%- endmacro -%}
+
+{%- macro vertica__edr_type_long_string() -%}
+    {% set long_string = 'varchar(' ~ elementary.get_config_var('long_string_size') ~ ')' %} {# column size doesn't impact the storage, it's just the string length upper boundary #}
+    {{ return(long_string) }}
 {%- endmacro -%}
 
 {%- macro redshift__edr_type_long_string() -%}
