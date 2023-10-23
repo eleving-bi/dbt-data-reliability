@@ -22,6 +22,10 @@
     {% do return(elementary.get_transaction_clean_elementary_test_tables_queries(test_table_relations)) %}
 {% endmacro %}
 
+{% macro vertica__get_clean_elementary_test_tables_queries(test_table_relations) %}
+    {% do return(elementary.get_transactionless_clean_elementary_test_tables_queries(test_table_relations)) %}
+{% endmacro %}
+
 {% macro bigquery__get_clean_elementary_test_tables_queries(test_table_relations) %}
     {% do return(elementary.get_transactionless_clean_elementary_test_tables_queries(test_table_relations)) %}
 {% endmacro %}
