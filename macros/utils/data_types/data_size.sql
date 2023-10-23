@@ -6,6 +6,10 @@
   {{ return(elementary.get_config_var('long_string_size')) }}
 {% endmacro %}
 
+{% macro vertica__get_column_size() %}
+  {{ return(elementary.get_config_var('long_string_size')) }}
+{% endmacro %}
+
 {% macro postgres__get_column_size() %}
   {{ return(none) }}
 {% endmacro %}
