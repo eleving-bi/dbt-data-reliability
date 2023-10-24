@@ -1,15 +1,8 @@
 {%- macro edr_cast_as_timestamp(timestamp_field) -%}
-    {{ return(adapter.dispatch('edr_cast_as_timestamp', 'elementary')(timestamp_field)) }}
-{%- endmacro -%}
-
-{%- macro default__edr_cast_as_timestamp(timestamp_field) -%}
     cast({{ timestamp_field }} as {{ elementary.edr_type_timestamp() }})
 {%- endmacro -%}
 
-{%- macro vertica__edr_cast_as_timestamp(timestamp_field) -%}
-    {{ timestamp_field }}::TIMESTAMP
-{%- endmacro -%}
-
+{# Custom macro used only to fix string cast to timestamp in Jinja context #}
 {%- macro edr_cast_string_to_timestamp(timestamp_field) -%}
     '{{ timestamp_field }}'::TIMESTAMP
 {%- endmacro -%}
