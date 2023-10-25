@@ -26,12 +26,17 @@ dbt_columns as (
     from {{ ref("dbt_columns") }}
 )
 
-select
-    database_name,
-    schema_name,
-    table_name,
-    name,
-    data_type,
-    description
-from information_schema_columns
-left join dbt_columns using (database_name, schema_name, table_name, name)
+SELECT
+    isc.database_name,
+    isc.schema_name,
+    isc.table_name,
+    isc.name,
+    isc.data_type,
+    dbc.description
+FROM
+    information_schema_columns isc
+LEFT JOIN dbt_columns dbc ON
+    isc.database_name = dbc.database_name
+    AND isc.schema_name = dbc.schema_name
+    AND isc.table_name = dbc.table_name
+    AND isc.name = dbc.name
