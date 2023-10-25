@@ -32,6 +32,18 @@
     trim(split(full_table_name,'.')[{{ part_index }}],'"') as {{ part_name }}
 {% endmacro %}
 
+{% macro vertica__full_name_split(part_name) %}
+    {%- if part_name == 'database_name' -%}
+        {%- set part_index = 1 -%}
+    {%- elif part_name == 'schema_name' -%}
+        {%- set part_index = 2 -%}
+    {%- elif part_name == 'table_name' -%}
+        {%- set part_index = 3 -%}
+    {%- else -%}
+        {{ return('') }}
+    {%- endif -%}
+    trim(split_part(full_table_name,'.',{{ part_index }}),'"') as {{ part_name }}
+{% endmacro %}
 
 {% macro bigquery__full_name_split(part_name) %}
     {%- if part_name == 'database_name' -%}
