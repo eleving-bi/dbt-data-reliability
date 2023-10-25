@@ -19,7 +19,9 @@
 
     {% set queries = elementary.get_delete_and_insert_queries(relation, insert_relation, delete_relation, delete_column_key) %}
     {% for query in queries %}
-        {% do elementary.run_query(query) %}
+        {% if query|length > 0 %}
+            {% do elementary.run_query(query) %}
+        {% endif %}
     {% endfor %}
 
     {# Make sure we delete the temp tables we created #}
@@ -52,6 +54,20 @@
         commit;
     {% endset %}
     {% do return([query]) %}
+{% endmacro %}
+
+{% macro vertica__get_delete_and_insert_queries(relation, insert_relation, delete_relation, delete_column_key) %}
+    {% set delete_query = '' %}
+    {% set insert_query = '' %}
+    
+    {%- if delete_relation -%}
+        {% set delete_query = 'DELETE FROM ' ~ relation ~ ' WHERE ' ~ delete_column_key ~ ' IS NULL OR ' ~ delete_column_key ~ ' IN (SELECT ' ~ delete_column_key ~ ' FROM ' ~ delete_relation ~ ');' %}
+    {%- endif -%}
+    
+    {% if insert_relation -%}
+        {% set insert_query = 'INSERT INTO ' ~ relation ~ ' SELECT * FROM ' ~ insert_relation ~ ';' %}
+    {%- endif -%}
+    {% do return(['BEGIN;', delete_query, insert_query, 'COMMIT;']) %}
 {% endmacro %}
 
 {% macro spark__get_delete_and_insert_queries(relation, insert_relation, delete_relation, delete_column_key) %}
