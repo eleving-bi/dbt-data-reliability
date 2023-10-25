@@ -10,15 +10,18 @@
 
     {% set columns = adapter.get_columns_in_relation(table_relation) %}
     {% if not columns %}
+      {% set columns = vertica__get_columns_in_temp_relation(table_relation) %}
+      {% if not columns %}
         {% set table_name = elementary.relation_to_full_name(table_relation) %}
         {{ elementary.edr_log('Could not extract columns for table - ' ~ table_name ~ ' (might be a permissions issue)') }}
         {{ return(none) }}
+      {% endif %}
     {% endif %}
 
     {{ elementary.file_log('Inserting {} rows to table {}'.format(rows | length, table_relation)) }}
     {% set insert_rows_method = elementary.get_config_var('insert_rows_method') %}
     {% if insert_rows_method == 'max_query_size' %}
-      {% set insert_rows_queries = get_insert_rows_queries(table_relation, columns, rows, on_query_exceed=on_query_exceed) %}
+      {% set insert_rows_queries = elementary.get_insert_rows_queries(table_relation, columns, rows, on_query_exceed=none) %}
       {% set queries_len = insert_rows_queries | length %}
       {% for insert_query in insert_rows_queries %}
         {% do elementary.file_log("[{}/{}] Running insert query.".format(loop.index, queries_len)) %}
@@ -27,7 +30,7 @@
     {% elif insert_rows_method == 'chunk' %}
       {% set rows_chunks = elementary.split_list_to_chunks(rows, chunk_size) %}
       {% for rows_chunk in rows_chunks %}
-        {% set insert_rows_query = get_chunk_insert_query(table_relation, columns, rows_chunk) %}
+        {% set insert_rows_query = elementary.get_chunk_insert_query(table_relation, columns, rows_chunk) %}
         {% do elementary.run_query(insert_rows_query) %}
       {% endfor %}
     {% else %}
@@ -39,62 +42,25 @@
     {% endif %}
 {% endmacro %}
 
-{# Using custom SELECT + UNION ALL instead of INSERT INTO ... VALUES #}
 {% macro get_insert_rows_queries(table_relation, columns, rows, query_max_size=none, on_query_exceed=none) -%}
-    {% if not query_max_size %}
-      {% set query_max_size = elementary.get_config_var('query_max_size') %}
-    {% endif %}
 
     {% set insert_queries = [] %}
-    {% set base_insert_query %}
+    {% set base_insert_query -%}
        insert into {{ table_relation }}
          ({%- for column in columns -%}
            {{- column.name -}} {{- "," if not loop.last else "" -}}
-         {%- endfor -%})
+         {%- endfor -%}) values
     {% endset %}
 
-    {% set current_query = namespace(data=base_insert_query) %}
     {% for row in rows %}
       {% set row_sql = elementary.render_row_to_sql(row, columns) %}
-        
-      {% set query_with_row = current_query.data %}
-        {% if loop.first %}
-            {% set query_with_row = query_with_row + ' SELECT ' + row_sql %}
-        {% else %}
-            {% set query_with_row = query_with_row + ' UNION ALL SELECT ' + row_sql %}
-        {% endif %}
-        
-        {% if query_with_row | length > query_max_size %}
-          {% if on_query_exceed %}
-            {% do on_query_exceed(row) %}
-            {% set row_sql = elementary.render_row_to_sql(row, columns) %}
-            {% set new_insert_query = base_insert_query + ' SELECT ' + row_sql %}
-          {% endif %}
-            
-          {% if new_insert_query | length > query_max_size %}
-            {% do elementary.file_log("Oversized row for insert_rows: {}".format(query_with_row)) %}
-            {% do exceptions.raise_compiler_error("Row to be inserted exceeds var('query_max_size'). Consider increasing its value.") %}
-          {% endif %}
-            
-          {% if current_query.data != base_insert_query %}
-                {% do insert_queries.append(current_query.data) %}
-            {% endif %}
-            
-            {% set current_query.data = new_insert_query %}
-        {% else %}
-            {% set current_query.data = query_with_row %}
-        {% endif %}
-        
-        {% if loop.last %}
-            {% do insert_queries.append(current_query.data) %}
-        {% endif %}
+      {% set full_query = base_insert_query + row_sql + ';' %}
+      {% do insert_queries.append(full_query) %}
     {% endfor %}
 
     {{ return(insert_queries) }}
-
 {%- endmacro %}
 
-{# Removed brackets #}
 {% macro render_row_to_sql(row, columns) %}
   {% set rendered_column_values = [] %}
   {% for column in columns %}
@@ -106,27 +72,31 @@
       {% do rendered_column_values.append(elementary.render_value(column_value)) %}
     {% endif %}
   {% endfor %}
-  {% set row_sql = "{}".format(rendered_column_values | join(",")) %} {# Removed brackets #}
+  {% set row_sql = "({})".format(rendered_column_values | join(",")) %}
   {% do return(row_sql) %}
 {% endmacro %}
 
-{# Using custom SELECT + UNION ALL instead of INSERT INTO ... VALUES #}
 {% macro get_chunk_insert_query(table_relation, columns, rows) -%}
-    {% set insert_rows_query %}
+    {% set base_insert_query %}
         insert into {{ table_relation }}
             ({%- for column in columns -%}
                 {{- column.name -}} {{- "," if not loop.last else "" -}}
-            {%- endfor -%})
-        {% for row in rows -%}
-            {{- ' SELECT ' if loop.first else ' UNION ALL SELECT ' -}}
-            {%- for column in columns -%}
-                {%- set column_value = elementary.insensitive_get_dict_value(row, column.name, none) -%}
-                {{ elementary.render_value(column_value) }}
-                {{- "," if not loop.last else "" -}}
-            {%- endfor -%}
-        {%- endfor %}
+            {%- endfor -%}) values
     {% endset %}
-    {{ return(insert_rows_query) }}
+    
+    {% set insert_queries = [] %}
+    {% for row in rows %}
+        {% set row_values = [] %}
+        {% for column in columns %}
+            {% set column_value = elementary.insensitive_get_dict_value(row, column.name, none) %}
+            {% do row_values.append(elementary.render_value(column_value)) %}
+        {% endfor %}
+        {% set row_sql = "({})".format(row_values | join(",")) %}
+        {% set full_query = base_insert_query + row_sql + ';' %}
+        {% do insert_queries.append(full_query) %}
+    {% endfor %}
+
+    {{ return(insert_queries) }}
 {%- endmacro %}
 
 {% macro escape_special_chars(string_value) %}
@@ -168,3 +138,41 @@
         NULL
     {%- endif -%}
 {%- endmacro -%}
+
+{# Copy from https://github.com/vertica/dbt-vertica/blob/master/dbt/include/vertica/macros/adapters/columns.sql #}
+{% macro vertica__get_columns_in_temp_relation(relation) -%}
+ 
+   {% call statement('get_columns_in_temp_relation', fetch_result=True) %}
+    select
+    column_name
+    , data_type
+    , character_maximum_length
+    , numeric_precision
+    , numeric_scale
+    from (
+        select
+        column_name
+        , data_type
+        , character_maximum_length
+        , numeric_precision
+        , numeric_scale
+        , ordinal_position
+        from v_catalog.columns
+        where  table_name = '{{ relation.identifier }}'
+        union all
+        select
+        column_name
+        , data_type
+        , character_maximum_length
+        , numeric_precision
+        , numeric_scale
+        , ordinal_position
+        from v_catalog.view_columns
+        where table_name = '{{ relation.identifier }}'
+    ) t
+    order by ordinal_position
+  {% endcall %}
+  {% set table = load_result('get_columns_in_temp_relation').table %}
+
+  {{ return(sql_convert_columns_in_relation(table)) }}
+{% endmacro %}
