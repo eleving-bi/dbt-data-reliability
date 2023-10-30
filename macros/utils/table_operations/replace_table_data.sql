@@ -10,8 +10,20 @@
 {% endmacro %}
 
 {% macro vertica__replace_table_data(relation, rows) %}
-    {% do dbt.truncate_relation(relation) %}
-    {% do elementary.insert_rows(relation, rows, should_commit=false, chunk_size=elementary.get_config_var('dbt_artifacts_chunk_size')) %}
+    {% set intermediate_relation = elementary.create_intermediate_relation(relation, rows, temporary=True) %}
+
+    {% set queries = [
+        "begin;",
+        "delete from " ~ relation ~ ";",
+        "insert into " ~ relation ~ " select * from " ~ intermediate_relation ~ ";",
+        "commit;"
+    ] %}
+    
+    {% for query in queries %}
+        {% do elementary.run_query(query) %}
+    {% endfor %}
+
+    {% do adapter.drop_relation(intermediate_relation) %}
 {% endmacro %}
 
 {# Databricks - truncate and insert (non-atomic) #}
