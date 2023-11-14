@@ -95,3 +95,24 @@
     {%- endset %}
     {{ return(complete_buckets_cte) }}
 {% endmacro %}
+
+{% macro vertica__complete_buckets_cte(time_bucket, bucket_end_expr, min_bucket_start_expr, max_bucket_end_expr) %}
+    {%- set complete_buckets_cte %}
+        with input_table as (
+            select {{ min_bucket_start_expr }} as dates
+            union all
+            select {{ max_bucket_end_expr }}
+        ),
+        time_series_cte as (
+            select time_series as edr_bucket_start
+            from input_table
+            timeseries time_series as '{{ time_bucket.count }} {{ time_bucket.period }}' over(order by input_table.dates)
+        )
+        select
+            edr_bucket_start,
+            {{ bucket_end_expr }} as edr_bucket_end
+        from time_series_cte
+        where {{ bucket_end_expr }} <= {{ max_bucket_end_expr }}
+    {%- endset %}
+    {{ return(complete_buckets_cte) }}
+{% endmacro %}
