@@ -1,5 +1,9 @@
 {% macro create_elementary_test_table(database_name, schema_name, test_name, table_type, sql_query) %}
     {% if execute %}
+        {% if test_name | length > 80 %}
+            {# {{ log("Truncating 'test_name' from '" ~ test_name ~ "' to 80 characters because the full 'test_name' with additional suffix is too long for Vertica (max 128 characters)", "debug") }} #}
+            {% set test_name = test_name | truncate(80, True, '') %}
+        {% endif %}
         {% set temp_table_name = elementary.table_name_with_suffix(test_name, "__" ~ table_type ~ elementary.get_timestamped_table_suffix()).replace("*", "") %}
         
         {% set default_identifier_quoting = api.Relation.get_default_quote_policy().get_part("identifier") %}        
